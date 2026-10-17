@@ -38,18 +38,16 @@ jobs:
         host: ${{ secrets.EC2_PUBLIC_IP }}
         username: ubuntu
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        # Expose the GitHub Repository Secrets into the execution block
-        envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION,AWS_ACCOUNT_ID,ECR_REPOSITORY_NAME
         script: |
-          # Log into your AWS registry directly using the passed variables
-          aws ecr get-login-password --region "${{ secrets.AWS_REGION }}" | docker login --username AWS --password-stdin "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+          # 1. Log in to ECR inside the EC2 machine
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
           
-          # Clean up old containers
+          # 2. Stop and clear old containers if they are running
           docker stop my-app || true
           docker rm my-app || true
           
-          # Pull the container directly utilizing GitHub Context placeholders
-          docker pull "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}://{{ secrets.ECR_REPOSITORY_NAME }}:latest"
+          # 3. Pull down the clean, updated image from ECR
+          docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}://{{ secrets.ECR_REPOSITORY_NAME }}:latest
           
-          # Deploy container live on port 5000
-          docker run -d --name my-app -p 5000:5000 "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}://{{ secrets.SSH_PRIVATE_KEY && secrets.ECR_REPOSITORY_NAME }}:latest"
+          # 4. Run the container live on port 5000
+          docker run -d --name my-app -p 5000:5000 ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}://{{ secrets.ECR_REPOSITORY_NAME }}:latest
