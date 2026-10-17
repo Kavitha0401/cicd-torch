@@ -2,18 +2,16 @@ name: Production CI/CD Deploy
 
 on:
   push:
-    branches: [ "main" ] # Triggers the pipeline when code is committed to main
+    branches: [ "main" ]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
     
-    # 1. Pull down the repository source code to the GitHub runner
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # 2. Authenticate the GitHub Actions runner with AWS
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -21,12 +19,10 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    # 3. Log the GitHub Actions runner into your Amazon ECR Registry
     - name: Log in to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    # 4. Build the Docker image locally and push it to your ECR Repository
     - name: Build and Push Image to ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -36,36 +32,27 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    # 5. Connect securely to EC2 via SSH and launch the fresh container
     - name: Deploy Live to EC2 via SSH
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.EC2_PUBLIC_IP }}
         username: ubuntu
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        # Pass GitHub secrets into the remote SSH shell environment variables
         envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION,AWS_ACCOUNT_ID,ECR_REPOSITORY_NAME
-      with:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-        ECR_REPOSITORY_NAME: ${{ secrets.ECR_REPOSITORY_NAME }}
-      script: |
-        # Export variables so the AWS CLI running inside EC2 can locate them
-        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-        export AWS_DEFAULT_REGION=$AWS_REGION
+        script: |
+          export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+          export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+          export AWS_DEFAULT_REGION=$AWS_REGION
 
-        # Authenticate Docker daemon on the EC2 machine with ECR
-        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_://amazonaws.com
-        
-        # Stop and clear the old container instances if they are running
-        docker stop my-app || true
-        docker rm my-app || true
-        
-        # Pull down the clean, updated image asset from ECR
-        docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_://amazonaws.com/$ECR_REPOSITORY_NAME:latest
-        
-        # Run the newly updated container on Port 5000
-        docker run -d --name my-app -p 5000:5000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_://amazonaws.com/$ECR_REPOSITORY_NAME:latest
+          # Log in to ECR on the EC2 machine
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          
+          # Clean up old containers
+          docker stop my-app || true
+          docker rm my-app || true
+          
+          # Pull the fresh image tracking the variables correctly
+          docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:latest
+          
+          # Run the fresh container instance
+          docker run -d --name my-app -p 5000:5000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:latest
