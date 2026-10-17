@@ -43,7 +43,6 @@ jobs:
         host: ${{ secrets.EC2_PUBLIC_IP }}
         username: ubuntu
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        # Pass GitHub secrets into the remote SSH shell environment variables
         envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION,AWS_ACCOUNT_ID,ECR_REPOSITORY_NAME
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -57,15 +56,15 @@ jobs:
         export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
         export AWS_DEFAULT_REGION=$AWS_REGION
 
-        # Authenticate Docker daemon on the EC2 machine with ECR
-        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_://amazonaws.com
+        # CORRECTED: Authenticate Docker daemon on the EC2 machine with ECR
+        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
         
         # Stop and clear the old container instances if they are running
         docker stop my-app || true
         docker rm my-app || true
         
-        # Pull down the clean, updated image asset from ECR
-        docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_://amazonaws.com/$ECR_REPOSITORY_NAME:latest
+        # CORRECTED: Pull down the clean, updated image asset from ECR
+        docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:latest
         
-        # Run the newly updated container on Port 5000
-        docker run -d --name my-app -p 5000:5000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_://amazonaws.com/$ECR_REPOSITORY_NAME:latest
+        # CORRECTED: Run the newly updated container on Port 5000
+        docker run -d --name my-app -p 5000:5000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:latest
