@@ -39,32 +39,32 @@ jobs:
     # 5. Connect securely to EC2 via SSH and launch the fresh container
     - name: Deploy Live to EC2 via SSH
       uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_PUBLIC_IP }}
-        username: ubuntu
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION,AWS_ACCOUNT_ID,ECR_REPOSITORY_NAME
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: ${{ secrets.AWS_REGION }}
         AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         ECR_REPOSITORY_NAME: ${{ secrets.ECR_REPOSITORY_NAME }}
-      script: |
-        # Export variables so the AWS CLI running inside EC2 can locate them
-        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-        export AWS_DEFAULT_REGION=$AWS_REGION
+      with:
+        host: ${{ secrets.EC2_PUBLIC_IP }}
+        username: ubuntu
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION,AWS_ACCOUNT_ID,ECR_REPOSITORY_NAME
+        script: |
+          # Export variables so the AWS CLI running inside EC2 can locate them
+          export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+          export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+          export AWS_DEFAULT_REGION=$AWS_REGION
 
-        # CORRECTED: Authenticate Docker daemon on the EC2 machine with ECR
-        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-        
-        # Stop and clear the old container instances if they are running
-        docker stop my-app || true
-        docker rm my-app || true
-        
-        # CORRECTED: Pull down the clean, updated image asset from ECR
-        docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:latest
-        
-        # CORRECTED: Run the newly updated container on Port 5000
-        docker run -d --name my-app -p 5000:5000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:latest
+          # Authenticate Docker daemon on the EC2 machine with ECR
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          
+          # Stop and clear the old container instances if they are running
+          docker stop my-app || true
+          docker rm my-app || true
+          
+          # Pull down the clean, updated image asset from ECR
+          docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:latest
+          
+          # Run the newly updated container on Port 5000
+          docker run -d --name my-app -p 5000:5000 $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY_NAME:latest
